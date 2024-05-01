@@ -1,3 +1,5 @@
+# dnsmgr_caihong
+A unified DNS management system enables managing domain name resolutions from multiple platforms within a single website. Currently supported domain name platforms include Alibaba Cloud, Tencent Cloud, Huawei Cloud, Western Digital, and CloudFlare.| 彩虹聚合DNS管理系统可以实现在一个网站内管理多个平台的域名解析，目前已支持的域名平台有：阿里云、腾讯云、华为云、西部数码、CloudFlare。
 ## 聚合DNS管理系统
 
 聚合DNS管理系统可以实现在一个网站内管理多个平台的域名解析，目前已支持的域名平台有：
@@ -82,4 +84,3 @@ location / {
 
 - [彩虹云主机 - 免备案CDN/虚拟主机](https://www.cccyun.net/)
 - [小白云高防云服务器](https://www.xiaobaiyun.cn/aff/GMLPMFOV)
-
