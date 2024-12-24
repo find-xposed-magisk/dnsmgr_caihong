@@ -1,3 +1,5 @@
+# dnsmgr_caihong
+A unified DNS management system enables managing domain name resolutions from multiple platforms within a single website. Currently supported domain name platforms include Alibaba Cloud, Tencent Cloud, Huawei Cloud, Western Digital, and CloudFlare.| 彩虹聚合DNS管理系统可以实现在一个网站内管理多个平台的域名解析，目前已支持的域名平台有：阿里云、腾讯云、华为云、西部数码、CloudFlare。
 ## 聚合DNS管理系统
 
 聚合DNS管理系统可以实现在一个网站内管理多个平台的域名解析，目前已支持的域名平台有：
@@ -9,13 +11,7 @@
 - DNSLA
 - CloudFlare
 
-### 功能特性
-
-- 多用户管理，可为每个用户可分配不同的域名解析权限
-- 提供API接口，可获取域名单独的登录链接，方便各种IDC系统对接
-- 容灾切换功能，支持ping、tcp、http(s)检测协议并自动暂停/修改域名解析，并支持邮件、微信公众号通知
-- CF优选IP功能，支持获取最新的Cloudflare优选IP，并自动更新到解析记录
-- SSL证书申请与自动部署功能，支持从Let's Encrypt等渠道申请SSL证书，并自动部署到各种面板、云服务商、服务器等
+本系统支持多用户，每个用户可分配不同的域名解析权限；支持API接口，支持获取域名独立DNS控制面板登录链接，方便各种IDC系统对接。
 
 ### 演示截图
 
@@ -34,22 +30,6 @@
 用户管理添加用户，支持为用户开启API接口
 
 ![](https://p0.meituan.net/csc/d1bd90bedca9b6cbc5da40286bdb5cd5228438.png)
-
-CF优选IP功能，添加优选IP任务
-
-![](https://p1.meituan.net/csc/da70c76753aee4bce044d16fadd56e5f217660.png)
-
-SSL证书申请功能
-
-![](https://blog.cccyun.cn/content/uploadfile/202412/QQ%E6%88%AA%E5%9B%BE20241221154857.png)
-
-![](https://blog.cccyun.cn/content/uploadfile/202412/QQ%E6%88%AA%E5%9B%BE20241221154652.png?a)
-
-SSL证书自动部署功能
-
-![](https://blog.cccyun.cn/content/uploadfile/202412/QQ%E6%88%AA%E5%9B%BE20241221154702.png)
-
-![](https://blog.cccyun.cn/content/uploadfile/202412/QQ%E6%88%AA%E5%9B%BE20241221154804.png)
 
 ### 部署方法
 
@@ -96,87 +76,11 @@ location / {
 </IfModule>
 ```
 
-### Docker部署方法
+### 版权信息
 
-首先需要安装Docker，然后执行以下命令拉取镜像并启动（启动后监听8081端口）：
-
-```
-docker run --name dnsmgr -dit -p 8081:80 -v /var/dnsmgr:/app/www netcccyun/dnsmgr
-```
-
-访问并安装好后如果容灾切换未自动启动，重启容器即可：
-
-```
-docker restart dnsmgr
-```
-
-### docker-compose部署方法
-
-```
-version: '3'
-services:
-  dnsmgr-web:
-    container_name: dnsmgr-web
-    stdin_open: true
-    tty: true
-    ports:
-      - 8081:80
-    volumes:
-      - /volume1/docker/dnsmgr/web:/app/www
-    image: netcccyun/dnsmgr
-    depends_on:
-      - dnsmgr-mysql
-    networks:
-      - dnsmgr-network
-
-  dnsmgr-mysql:
-    container_name: dnsmgr-mysql
-    restart: always
-    ports:
-      - 3306:3306
-    volumes:
-      - ./mysql/conf/my.cnf:/etc/mysql/my.cnf
-      - ./mysql/logs:/logs
-      - ./mysql/data:/var/lib/mysql
-    environment:
-      - MYSQL_ROOT_PASSWORD=123456
-      - TZ=Asia/Shanghai
-    image: mysql:5.7
-    networks:
-      - dnsmgr-network
-
-networks:
-  dnsmgr-network:
-    driver: bridge
-```
-
-在运行之前请创建好目录
-```
-mkdir -p ./web
-mkdir -p ./mysql/conf
-mkdir -p ./mysql/logs
-mkdir -p ./mysql/data
-
-vim mysql/conf/my.cnf
-[mysqld]
-sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
-```
-
-登陆mysql容器创建数据库
-```
-docker exec -it dnsmgr-mysql /bin/bash
-mysql -uroot -p123456
-create database dnsmgr;
-```
-
-在install界面链接IP填写dnsmgr-mysql
-
-### 作者信息
-
-消失的彩虹海(https://blog.cccyun.cn)
+版权所有Copyright © 2023~2024 by 消失的彩虹海(https://blog.cccyun.cn)
 
 ### 其他推荐
 
 - [彩虹云主机 - 免备案CDN/虚拟主机](https://www.cccyun.net/)
 - [小白云高防云服务器](https://www.xiaobaiyun.cn/aff/GMLPMFOV)
-
