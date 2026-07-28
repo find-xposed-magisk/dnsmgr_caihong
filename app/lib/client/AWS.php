@@ -159,6 +159,9 @@ class AWS
             'X-Amz-Date' => $date,
             //'X-Amz-Content-Sha256' => hash("sha256", $body),
         ];
+        if ($method != 'GET' && $method != 'DELETE') {
+            $headers['Content-Type'] = 'application/xml';
+        }
         if ($this->etag) {
             $headers['If-Match'] = $this->etag;
         }
@@ -353,7 +356,8 @@ class AWS
                 }
 
             } else {
-                $xml->addChild($key, $value);
+                $escapedValue = htmlspecialchars((string)$value, ENT_XML1 | ENT_COMPAT, 'UTF-8');
+                $xml->addChild($tagName, $escapedValue);
             }
         }
 

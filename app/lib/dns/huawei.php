@@ -60,7 +60,7 @@ class huawei implements DnsInterface
     }
 
     //获取解析记录列表
-    public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
+    public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null, $SortField = null, $SortOrder = 'asc')
     {
         $offset = ($PageNumber - 1) * $PageSize;
         $query = ['type' => $Type, 'line_id' => $Line, 'name' => $KeyWord, 'offset' => $offset, 'limit' => $PageSize, 'records' => $Value];
@@ -72,6 +72,13 @@ class huawei implements DnsInterface
             $SubDomain = $this->getHost($SubDomain);
             $query['name'] = $SubDomain;
             $query['search_mode'] = 'equal';
+        }
+        $allowedSort = ['Name' => 'name', 'Type' => 'type', 'UpdateTime' => 'updated_at'];
+        if ($SortField && isset($allowedSort[$SortField])) {
+            $query += [
+                'sort_key' => $allowedSort[$SortField],
+                'sort_dir' => strtolower($SortOrder),
+            ];
         }
         $data = $this->send_request('GET', '/v2.1/zones/'.$this->domainid.'/recordsets', $query);
         if ($data) {

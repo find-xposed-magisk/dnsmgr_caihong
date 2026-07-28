@@ -82,7 +82,7 @@ class cloudflare implements DnsInterface
     }
 
     //获取解析记录列表
-    public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
+    public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null, $SortField = null, $SortOrder = 'asc')
     {
         if (!isNullOrEmpty($Value)) $KeyWord = $Value;
         $param = ['type' => $Type, 'search' => $KeyWord, 'page' => $PageNumber, 'per_page' => $PageSize];
@@ -94,6 +94,11 @@ class cloudflare implements DnsInterface
         }
         if (!isNullOrEmpty($Line)) {
             $param['proxied'] = $Line == '1' ? 'true' : 'false';
+        }
+        $allowedSort = ['Name' => 'name', 'Type' => 'type', 'LineName' => 'proxied', 'Value' => 'content'];
+        if ($SortField && isset($allowedSort[$SortField])) {
+            $param['order'] = $allowedSort[$SortField];
+            $param['direction'] = strtolower($SortOrder) === 'desc' ? 'desc' : 'asc';
         }
         $data = $this->send_reuqest('GET', '/zones/'.$this->domainid.'/dns_records', $param);
         if ($data) {

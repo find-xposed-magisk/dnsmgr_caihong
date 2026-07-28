@@ -63,7 +63,7 @@ class dnspod implements DnsInterface
     }
 
     //获取解析记录列表
-    public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
+    public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null, $SortField = null, $SortOrder = 'asc')
     {
         $offset = ($PageNumber - 1) * $PageSize;
         $groupid = request()->post('groupid');
@@ -83,6 +83,11 @@ class dnspod implements DnsInterface
         } else {
             $action = 'DescribeRecordList';
             $param = ['Domain' => $this->domain, 'Subdomain' => $SubDomain, 'RecordType' => $this->convertType($Type), 'RecordLineId' => $Line, 'Keyword' => $KeyWord, 'Offset' => $offset, 'Limit' => $PageSize];
+        }
+        $allowedSort = ['Name' => 'name', 'Type' => 'type', 'LineName' => 'line', 'Value' => 'value', 'UpdateTime' => 'updated_on'];
+        if ($SortField && isset($allowedSort[$SortField])) {
+            $param['SortField'] = $allowedSort[$SortField];
+            $param['SortType'] = strtolower($SortOrder) === 'desc' ? 'DESC' : 'ASC';
         }
         $data = $this->send_request($action, $param);
         if ($data) {

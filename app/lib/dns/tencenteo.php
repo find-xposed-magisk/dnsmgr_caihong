@@ -71,7 +71,7 @@ class tencenteo implements DnsInterface
     }
 
     //获取解析记录列表
-    public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
+    public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null, $SortField = null, $SortOrder = 'asc')
     {
         $offset = ($PageNumber - 1) * $PageSize;
         $action = 'DescribeDnsRecords';
@@ -90,6 +90,11 @@ class tencenteo implements DnsInterface
             $filters[] = ['Name' => 'type', 'Values' => [$Type]];
         }
         $param = ['ZoneId' => $this->domainid, 'Offset' => $offset, 'Limit' => $PageSize, 'Filters' => $filters];
+        $allowedSort = ['Name' => 'name', 'Type' => 'type', 'Value' => 'content', 'UpdateTime' => 'modified-on'];
+        if ($SortField && isset($allowedSort[$SortField])) {
+            $param['SortBy'] = $allowedSort[$SortField];
+            $param['SortOrder'] = strtolower($SortOrder);
+        }
         $data = $this->send_request($action, $param);
         if ($data) {
             $list = [];

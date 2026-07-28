@@ -267,6 +267,7 @@ $(document).ready(function(){
 		classes: 'table table-striped table-hover table-bordered',
 		uniqueId: 'RecordId',
 		sidePagination: sidePagination,
+		sortReset: false,
 		columns: [
 			{
 				field: '',
@@ -279,11 +280,13 @@ $(document).ready(function(){
 			},
 		   {
 			   field: 'Name',
-			   title: '主机记录'
+			   title: '主机记录',
+			   sortable: dnsconfig.sort
 		   },
 			{
 				field: 'Type',
 				title: '记录类型',
+				sortable: dnsconfig.sort,
 				formatter: function(value, row, index) {
 					if(value == 'REDIRECT_URL') return '显性URL';
 					if(value == 'FORWARD_URL') return '隐性URL';
@@ -292,11 +295,13 @@ $(document).ready(function(){
 			},
 			{
 				field: 'LineName',
-				title: '线路类型'
+				title: '线路类型',
+				sortable: dnsconfig.sort
 			},
 			{
 			   field: 'Value',
 			   title: '记录值',
+			   sortable: dnsconfig.sort,
 			   formatter: function(value, row, index) {
 				   var copyId = 'copy-value-' + row.RecordId;
 				   if(row.Type == 'MX' && dnsconfig.type!='huawei') {
@@ -326,7 +331,8 @@ $(document).ready(function(){
 			{
 				field: 'UpdateTime',
 				visible: false,
-				title: '最后更新时间'
+				title: '最后更新时间',
+				sortable: dnsconfig.sort
 			},
 			{
 				field: 'Status',

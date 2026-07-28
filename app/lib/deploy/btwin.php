@@ -207,7 +207,7 @@ class btwin implements DeployInterface
     {
         $url = $this->url . $path;
 
-        $now_time = time();
+        $now_time = (string) time();
         $headers = [];
         if ($file) {
             $post_data = [

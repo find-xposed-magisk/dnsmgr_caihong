@@ -483,6 +483,8 @@ class Domain extends BaseController
         $type = input('post.type', null, 'trim');
         $line = input('post.line', null, 'trim');
         $status = input('post.status', null, 'trim');
+        $sort = input('post.sortName', null, 'trim');
+        $sortOrder = strtolower(input('post.sortOrder', 'asc')) === 'desc' ? 'desc' : 'asc';
         $offset = input('post.offset/d', 0);
         $limit = input('post.limit/d', 10);
         if ($limit == 0) {
@@ -498,7 +500,14 @@ class Domain extends BaseController
         if (!checkPermission(0, $drow['name'])) return json(['total' => 0, 'rows' => []]);
 
         $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
-        $domainRecords = $dns->getDomainRecords($page, $limit, $keyword, $subdomain, $value, $type, $line, $status);
+        $dnstype = Db::name('account')->where('id', $drow['aid'])->value('type');
+        if (DnsHelper::$dns_config[$dnstype]['sort']) {
+            $allowedSort = ['Name', 'Type', 'LineName', 'Value', 'UpdateTime'];
+            $sort = in_array($sort, $allowedSort, true) ? $sort : null;
+            $domainRecords = $dns->getDomainRecords($page, $limit, $keyword, $subdomain, $value, $type, $line, $status, $sort, $sortOrder);
+        } else {
+            $domainRecords = $dns->getDomainRecords($page, $limit, $keyword, $subdomain, $value, $type, $line, $status);
+        }
         if (!$domainRecords) return json(['total' => 0, 'rows' => []]);
 
         if (empty($keyword) && empty($subdomain) && empty($type) && isNullOrEmpty($line) && empty($status) && empty($value) && $domainRecords['total'] != $drow['recordcount']) {
@@ -511,7 +520,6 @@ class Domain extends BaseController
             $row['LineName'] = isset($recordLine[$row['Line']]) ? $recordLine[$row['Line']]['name'] : $row['Line'];
         }
 
-        $dnstype = Db::name('account')->where('id', $drow['aid'])->value('type');
         if (DnsHelper::$dns_config[$dnstype]['page']) {
             return json($domainRecords['list']);
         }

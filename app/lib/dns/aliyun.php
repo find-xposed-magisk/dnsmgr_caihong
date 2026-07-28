@@ -60,7 +60,7 @@ class aliyun implements DnsInterface
     }
 
     //获取解析记录列表
-    public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
+    public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null, $SortField = null, $SortOrder = 'asc')
     {
         $param = ['Action' => 'DescribeDomainRecords', 'DomainName' => $this->domain, 'PageNumber' => $PageNumber, 'PageSize' => $PageSize];
         if (!empty($SubDomain) || !empty($Type) || !empty($Line) || !empty($Value)) {
@@ -75,6 +75,13 @@ class aliyun implements DnsInterface
         $groupid = request()->post('groupid');
         if (!empty($groupid)) {
             $param += ['GroupId' => $groupid];
+        }
+        $allowedSort = ['Name' => 'RR', 'Type' => 'Type', 'LineName' => 'Line', 'Value' => 'Value', 'UpdateTime' => 'UpdateDate'];
+        if ($SortField && isset($allowedSort[$SortField])) {
+            $param += [
+                'OrderBy' => $allowedSort[$SortField],
+                'Direction' => strtolower($SortOrder) === 'desc' ? 'DESC' : 'ASC',
+            ];
         }
         $data = $this->request($param, true);
         if ($data) {

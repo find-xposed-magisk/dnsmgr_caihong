@@ -145,7 +145,7 @@ class btwaf implements DeployInterface
     {
         $url = $this->url . $path;
 
-        $now_time = time();
+        $now_time = (string) time();
         $headers = [
             'waf_request_time' => $now_time,
             'waf_request_token' => md5($now_time . md5($this->key)),

@@ -41,6 +41,7 @@ class DnsHelper
             'weight' => false, //是否支持权重
             'page' => false, //是否客户端分页
             'add' => true, //是否支持添加域名
+            'sort' => true, //是否支持排序
         ],
         'dnspod' => [
             'name' => '腾讯云',
@@ -76,6 +77,7 @@ class DnsHelper
             'weight' => true,
             'page' => false,
             'add' => true,
+            'sort' => true,
         ],
         'huawei' => [
             'name' => '华为云',
@@ -111,6 +113,7 @@ class DnsHelper
             'weight' => true,
             'page' => false,
             'add' => true,
+            'sort' => true,
         ],
         'baidu' => [
             'name' => '百度云',
@@ -146,6 +149,7 @@ class DnsHelper
             'weight' => false,
             'page' => true,
             'add' => true,
+            'sort' => false,
         ],
         'west' => [
             'name' => '西部数码',
@@ -181,6 +185,7 @@ class DnsHelper
             'weight' => false,
             'page' => false,
             'add' => false,
+            'sort' => false,
         ],
         'huoshan' => [
             'name' => '火山引擎',
@@ -216,6 +221,7 @@ class DnsHelper
             'weight' => true,
             'page' => false,
             'add' => true,
+            'sort' => false,
         ],
         'jdcloud' => [
             'name' => '京东云',
@@ -251,6 +257,7 @@ class DnsHelper
             'weight' => true,
             'page' => false,
             'add' => true,
+            'sort' => false,
         ],
         'dnsla' => [
             'name' => 'DNSLA',
@@ -286,6 +293,7 @@ class DnsHelper
             'weight' => true,
             'page' => false,
             'add' => true,
+            'sort' => false,
         ],
         'qingcloud' => [
             'name' => '青云',
@@ -321,6 +329,7 @@ class DnsHelper
             'weight' => true,
             'page' => false,
             'add' => false,
+            'sort' => false,
         ],
         'bt' => [
             'name' => '宝塔域名',
@@ -362,6 +371,7 @@ class DnsHelper
             'weight' => true,
             'page' => false,
             'add' => true,
+            'sort' => false,
         ],
         'cloudflare' => [
             'name' => 'Cloudflare',
@@ -406,6 +416,7 @@ class DnsHelper
             'weight' => false,
             'page' => false,
             'add' => true,
+            'sort' => true,
         ],
         'namesilo' => [
             'name' => 'NameSilo',
@@ -441,6 +452,7 @@ class DnsHelper
             'weight' => false,
             'page' => true,
             'add' => false,
+            'sort' => false,
         ],
         'henet' => [
             'name' => 'HE DNS',
@@ -476,6 +488,7 @@ class DnsHelper
             'weight' => false,
             'page' => true,
             'add' => false,
+            'sort' => false,
         ],
         'spaceship' => [
             'name' => 'Spaceship',
@@ -511,6 +524,7 @@ class DnsHelper
             'weight' => false,
             'page' => false,
             'add' => false,
+            'sort' => false,
         ],
         'powerdns' => [
             'name' => 'PowerDNS',
@@ -552,6 +566,7 @@ class DnsHelper
             'weight' => false,
             'page' => true,
             'add' => true,
+            'sort' => false,
         ],
         'technitium' => [
             'name' => 'Technitium',
@@ -587,6 +602,7 @@ class DnsHelper
             'weight' => false,
             'page' => true,
             'add' => true,
+            'sort' => false,
         ],
         'aliyunesa' => [
             'name' => '阿里云ESA',
@@ -632,6 +648,7 @@ class DnsHelper
             'weight' => false,
             'page' => false,
             'add' => false,
+            'sort' => false,
         ],
         'tencenteo' => [
             'name' => '腾讯云EO',
@@ -677,6 +694,7 @@ class DnsHelper
             'weight' => true,
             'page' => false,
             'add' => false,
+            'sort' => true,
         ],
         'dnsmgr' => [
             'name' => '同系统对接',
@@ -718,6 +736,7 @@ class DnsHelper
             'weight' => true,
             'page' => false,
             'add' => false,
+            'sort' => false,
         ],
     ];
 
