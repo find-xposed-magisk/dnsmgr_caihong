@@ -195,6 +195,7 @@ function parseExcelRows(rows){
 		var weightText = getColumn(source, ['权重', 'Weight', 'weight']);
 		var remark = getColumn(source, ['备注', 'Remark', 'remark']);
 		if(!name && !type && !lineDescription && !value && !ttlText && !weightText) continue;
+		if((type == 'NS' || type == 'SOA') && name == '@') continue;
 
 		if(type === '显性URL') type = 'REDIRECT_URL';
 		if(type === '隐性URL') type = 'FORWARD_URL';
