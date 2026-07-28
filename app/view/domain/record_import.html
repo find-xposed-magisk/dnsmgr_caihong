@@ -1,0 +1,330 @@
+{extend name="common/layout" /}
+{block name="title"}导入解析记录 - {$domainName}{/block}
+{block name="main"}
+<div class="row">
+<div class="col-xs-12 center-block" style="float:none;">
+<div class="panel panel-default">
+	<div class="panel-heading">
+		<h3 class="panel-title">
+			<a href="/record/{$domainId}" class="btn btn-sm btn-default pull-right" style="margin-top:-6px"><i class="fa fa-reply fa-fw"></i> 返回</a>
+			导入解析记录 - {$domainName}
+		</h3>
+	</div>
+	<div class="panel-body">
+		<div class="form-group">
+			<label>选择Excel文件</label>
+			<input type="file" id="excel-file" class="form-control" accept=".xlsx,.xls">
+			<p class="help-block">首个工作表须包含：主机记录、记录类型、线路类型、记录值、TTL；权重列可选。未匹配到的线路将使用默认线路。</p>
+		</div>
+		<div id="import-toolbar" style="display:none;margin-bottom:12px;">
+			<button type="button" id="confirm-import" class="btn btn-primary" onclick="startImport()"><i class="fa fa-check"></i> 确认添加</button>
+			<span id="record-count" style="margin-left:10px;"></span>
+		</div>
+		<div id="preview-container" class="table-responsive" style="display:none;max-height:600px;overflow:auto;">
+			<table class="table table-striped table-hover table-bordered">
+				<thead>
+					<tr>
+						<th style="width:60px;">序号</th>
+						<th>主机记录</th>
+						<th>记录类型</th>
+						<th>线路类型</th>
+						<th>记录值</th>
+						<th>TTL</th>
+						<th>权重</th>
+						<th style="min-width:160px;">添加结果</th>
+					</tr>
+				</thead>
+				<tbody id="preview-body"></tbody>
+			</table>
+		</div>
+	</div>
+</div>
+</div>
+</div>
+{/block}
+{block name="script"}
+<script src="/static/js/layer/layer.js"></script>
+<script src="/static/js/xlsx.full.min.js"></script>
+<script>
+var recordLine = {$recordLine|json_encode|raw};
+var dnsconfig = {$dnsconfig|json_encode|raw};
+var defaultLineId = {$defaultLine|json_encode|raw};
+var minTTL = parseInt('{$minTTL}', 10) || 1;
+var importRecords = [];
+var importing = false;
+var lineMatcher = createLineMatcher(recordLine, defaultLineId);
+
+$(document).ready(function(){
+	$('#excel-file').on('change', function(){
+		if(this.files && this.files[0]) readExcelFile(this.files[0]);
+	});
+});
+
+function normalizeText(value){
+	return value === null || typeof value === 'undefined' ? '' : String(value).trim();
+}
+
+function normalizeLineText(value){
+	return normalizeText(value)
+		.replace(/\s+/g, '')
+		.replace(/[＿－—–-]/g, '_')
+		.replace(/__+/g, '_')
+		.replace(/^_+|_+$/g, '');
+}
+
+function canonicalLineName(value){
+	var name = normalizeLineText(value);
+	var aliases = {
+		'全网默认': '默认', '默认线路': '默认', 'Default': '默认', 'default': '默认',
+		'中国地区': '境内', '中国大陆': '境内', '中国内地': '境内',
+		'海外': '境外', '海外线路': '境外', 'Worldwide': '境外',
+		'全球(不含中国内地)': '境外', '港澳台及海外': '境外',
+		'搜索引擎线路': '搜索引擎',
+		'电信通/长宽': '长城宽带',
+		'方正': '方正宽带',
+		'华数': '华数宽带',
+		'中国港澳台': '港澳台地区',
+		'东非洲地区': '东非地区',
+		'南非洲地区': '南非地区',
+		'西非洲地区': '西非地区',
+		'北非洲地区': '北非地区',
+		'中非洲地区': '中非地区',
+		'亚太地区': '亚洲',
+		'North America': '北美洲',
+		'South America': '南美洲',
+		'Europe': '欧洲',
+		'Asia': '亚洲',
+		'Oceania': '大洋洲',
+		'Africa': '非洲',
+	};
+	if(aliases[name]) return aliases[name];
+
+	name = name.replace(/(东北|华东|华中|华南|西北|西南)地区/g, '$1');
+	var prefixes = ['中国地区_', '中国大陆_', '中国_', '东北_', '华东_', '华中_', '华南_', '西北_', '西南_',
+		'非洲_', '亚洲_', '欧洲_', '北美洲_', '南美洲_', '大洋洲_', '全球_'];
+	var changed = true;
+	while(changed){
+		changed = false;
+		for(var i = 0; i < prefixes.length; i++){
+			if(name.indexOf(prefixes[i]) === 0){
+				name = name.substring(prefixes[i].length);
+				changed = true;
+				break;
+			}
+		}
+	}
+
+	name = name.replace(/中国(移动|联通|电信|教育网|广电|铁通|鹏博士|科技网)/g, '$1');
+	var carriers = ['移动', '联通', '电信', '教育网', '广电', '铁通', '鹏博士', '科技网'];
+	for(var j = 0; j < carriers.length; j++){
+		var carrier = carriers[j];
+		if(name !== carrier && name.slice(-carrier.length) === carrier){
+			name = carrier + '_' + name.slice(0, -carrier.length).replace(/_+$/g, '');
+			break;
+		}
+	}
+	name = normalizeLineText(name);
+	return aliases[name] || name;
+}
+
+function createLineMatcher(lines, defaultId){
+	var byId = {};
+	for(var i = 0; i < lines.length; i++) byId[String(lines[i].id)] = lines[i];
+
+	var map = {};
+	var defaultItem = byId[String(defaultId)] || (lines.length ? lines[0] : {id: defaultId || '', name: '默认'});
+	for(var j = 0; j < lines.length; j++){
+		var lineKey = canonicalLineName(lines[j].name);
+		if(lineKey && !map[lineKey]) map[lineKey] = lines[j];
+		if(lineKey === '默认') defaultItem = lines[j];
+	}
+
+	return {
+		match: function(description){
+			var requestedName = canonicalLineName(description);
+			var item = map[requestedName] || defaultItem;
+			return {
+				id: String(item.id),
+				name: normalizeText(item.name),
+				isDefault: !!requestedName && item === defaultItem && requestedName !== canonicalLineName(item.name)
+			};
+		}
+	};
+}
+
+function readExcelFile(file){
+	if(typeof XLSX === 'undefined'){
+		layer.alert('Excel组件加载失败，请刷新页面后重试', {icon: 2});
+		return;
+	}
+	var reader = new FileReader();
+	reader.onload = function(event){
+		try{
+			var workbook = XLSX.read(new Uint8Array(event.target.result), {type: 'array'});
+			if(!workbook.SheetNames.length) throw new Error('Excel中没有工作表');
+			var rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {defval: '', raw: false});
+			parseExcelRows(rows);
+		}catch(e){
+			resetPreview();
+			layer.alert('读取Excel失败：' + e.message, {icon: 2});
+		}
+	};
+	reader.onerror = function(){
+		resetPreview();
+		layer.alert('读取Excel文件失败', {icon: 2});
+	};
+	reader.readAsArrayBuffer(file);
+}
+
+function getColumn(row, names){
+	for(var i = 0; i < names.length; i++){
+		if(Object.prototype.hasOwnProperty.call(row, names[i])) return normalizeText(row[names[i]]);
+	}
+	return '';
+}
+
+function parseExcelRows(rows){
+	importRecords = [];
+	for(var i = 0; i < rows.length; i++){
+		var source = rows[i];
+		var name = getColumn(source, ['主机记录', '主机名', 'Name', 'name']);
+		var type = getColumn(source, ['记录类型', '类型', 'Type', 'type']).toUpperCase();
+		var lineDescription = getColumn(source, ['线路类型', '线路', 'LineName', 'line']);
+		var value = getColumn(source, ['记录值', 'Value', 'value']);
+		var ttlText = getColumn(source, ['TTL', 'ttl']);
+		var weightText = getColumn(source, ['权重', 'Weight', 'weight']);
+		var remark = getColumn(source, ['备注', 'Remark', 'remark']);
+		if(!name && !type && !lineDescription && !value && !ttlText && !weightText) continue;
+
+		if(type === '显性URL') type = 'REDIRECT_URL';
+		if(type === '隐性URL') type = 'FORWARD_URL';
+		var mx = 1;
+		if(type === 'MX'){
+			var mxMatch = value.match(/^(.*)\s+\|\s+(\d+)$/);
+			if(mxMatch){
+				value = mxMatch[1];
+				mx = parseInt(mxMatch[2], 10);
+			}
+		}
+		var ttl = ttlText === '' ? Math.max(600, minTTL) : parseInt(ttlText, 10);
+		if(!isNaN(ttl) && ttl < minTTL) ttl = minTTL;
+		var weight = weightText === '' ? 0 : parseInt(weightText, 10);
+		var matchedLine = lineMatcher.match(lineDescription);
+		var errors = [];
+		if(!name) errors.push('主机记录为空');
+		if(!type) errors.push('记录类型为空');
+		if(!value) errors.push('记录值为空');
+		if(isNaN(ttl)) errors.push('TTL格式错误');
+
+		importRecords.push({
+			name: name,
+			type: type,
+			lineDescription: lineDescription || '默认',
+			line: matchedLine.id,
+			lineName: matchedLine.name,
+			lineFallback: matchedLine.isDefault,
+			value: value,
+			ttl: ttl,
+			weight: isNaN(weight) ? 0 : weight,
+			mx: mx,
+			remark: remark,
+			valid: errors.length === 0,
+			result: errors.length ? errors.join('；') : '待添加'
+		});
+	}
+	if(!importRecords.length){
+		resetPreview();
+		layer.msg('Excel中没有可导入的记录');
+		return;
+	}
+	renderPreview();
+}
+
+function resetPreview(){
+	importRecords = [];
+	$('#preview-body').empty();
+	$('#preview-container,#import-toolbar').hide();
+}
+
+function renderPreview(){
+	var $body = $('#preview-body').empty();
+	for(var i = 0; i < importRecords.length; i++){
+		var record = importRecords[i];
+		var lineText = record.lineDescription;
+		if(record.lineFallback){
+			lineText += ' → ' + record.lineName;
+		}else if(canonicalLineName(record.lineDescription) !== canonicalLineName(record.lineName)){
+			lineText += ' → ' + record.lineName;
+		}
+		var $row = $('<tr>');
+		$row.append($('<td>').text(i + 1));
+		$row.append($('<td>').text(record.name));
+		$row.append($('<td>').text(record.type));
+		$row.append($('<td>').text(lineText));
+		$row.append($('<td>').text(record.value));
+		$row.append($('<td>').text(record.ttl));
+		$row.append($('<td>').text(record.weight));
+		$row.append($('<td>').attr('id', 'import-result-' + i)
+			.addClass(record.valid ? 'text-muted' : 'text-danger').text(record.result));
+		$body.append($row);
+	}
+	$('#record-count').text('共 ' + importRecords.length + ' 条待处理记录');
+	$('#preview-container,#import-toolbar').show();
+	$('#confirm-import').prop('disabled', false);
+}
+
+async function startImport(){
+	if(importing || !importRecords.length) return;
+	importing = true;
+	$('#confirm-import,#excel-file').prop('disabled', true);
+	var success = 0;
+	var fail = 0;
+
+	for(var i = 0; i < importRecords.length; i++){
+		var record = importRecords[i];
+		var $result = $('#import-result-' + i);
+		$result.removeClass('text-muted text-danger text-success').addClass('text-info').text('正在添加...');
+		try{
+			var response = await $.ajax({
+				type: 'POST',
+				url: '/record/add/{$domainId}',
+				dataType: 'json',
+				data: {
+					name: record.name,
+					type: record.type,
+					line: record.line,
+					value: record.value,
+					ttl: record.ttl,
+					weight: record.weight,
+					mx: record.mx,
+					remark: record.remark
+				}
+			});
+			if(response.code === 0){
+				success++;
+				record.result = '添加成功';
+				$result.removeClass('text-info').addClass('text-success').text(record.result);
+			}else{
+				fail++;
+				record.result = response.msg || '添加失败';
+				$result.removeClass('text-info').addClass('text-danger').text(record.result);
+			}
+		}catch(e){
+			fail++;
+			record.result = '请求失败';
+			$result.removeClass('text-info').addClass('text-danger').text(record.result);
+		}
+	}
+
+	importing = false;
+	$('#excel-file').prop('disabled', false);
+	$('#confirm-import').prop('disabled', true);
+	layer.alert('全部添加完成，成功 ' + success + ' 个，失败 ' + fail + ' 个。', {
+		title: '导入结果',
+		icon: fail === 0 ? 1 : 0
+	}, function() {
+		window.location.href='/record/{$domainId}';
+	});
+}
+</script>
+{/block}

@@ -113,6 +113,7 @@ Route::group(function () {
     Route::post('/record/weight/data/:id', 'domain/weight_data');
     Route::any('/record/weight/:id', 'domain/weight');
     Route::any('/record/alias/:id', 'domain/alias');
+    Route::get('/record/import/:id', 'domain/record_import');
     Route::get('/record/:id', 'domain/record');
     Route::get('/record/smartparse', 'domain/smartparse');
     Route::post('/record/quickinfo/:id', 'domain/quickinfo');

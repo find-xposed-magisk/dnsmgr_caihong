@@ -188,7 +188,7 @@ td{overflow: hidden;text-overflow: ellipsis;white-space: nowrap;max-width:360px;
   {if $dnsconfig.type=='dnspod'}<a href="/record/alias/{$domainId}" class="btn btn-default">域名别名</a>{/if}
   <div class="btn-group" role="group">
 	<button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">批量操作 <span class="caret"></span></button>
-	<ul class="dropdown-menu"><li><a href="/record/batchadd/{$domainId}">添加</a></li><li><a href="javascript:operation('open')">启用</a></li><li><a href="javascript:operation('pause')">暂停</a></li><li><a href="javascript:operation('edit')">修改记录</a></li><li><a href="javascript:operation('editline')">修改线路</a></li>{if $dnsconfig.remark == 1}<li><a href="javascript:operation('editremark')">修改备注</a></li>{/if}{if $dnsconfig.type=='aliyun' || $dnsconfig.type=='dnspod'}<li><a href="javascript:operation('editgroup')">修改分组</a></li>{/if}<li><a href="javascript:operation('delete')">删除</a></li></ul>
+	<ul class="dropdown-menu"><li><a href="/record/batchadd/{$domainId}">添加</a></li><li><a href="javascript:operation('open')">启用</a></li><li><a href="javascript:operation('pause')">暂停</a></li><li><a href="javascript:operation('edit')">修改记录</a></li><li><a href="javascript:operation('editline')">修改线路</a></li>{if $dnsconfig.remark == 1}<li><a href="javascript:operation('editremark')">修改备注</a></li>{/if}{if $dnsconfig.type=='aliyun' || $dnsconfig.type=='dnspod'}<li><a href="javascript:operation('editgroup')">修改分组</a></li>{/if}<li><a href="javascript:operation('delete')">删除</a></li><li role="separator" class="divider"></li><li><a href="javascript:exportExcel()">导出记录</a></li><li><a href="/record/import/{$domainId}">导入记录</a></li></ul>
   </div>
   <div class="btn-group" role="group">
 	<button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">日志 <span class="caret"></span></button>
@@ -246,6 +246,7 @@ td{overflow: hidden;text-overflow: ellipsis;white-space: nowrap;max-width:360px;
 <script src="/static/js/bootstrap-table-1.21.4.min.js"></script>
 <script src="/static/js/bootstrap-table-page-jump-to-1.21.4.min.js"></script>
 <script src="/static/js/bootstrapValidator.min.js"></script>
+<script src="/static/js/xlsx.full.min.js"></script>
 <script src="/static/js/custom.js?v=1006"></script>
 <script>
 var recordLine = {$recordLine|json_encode|raw};
@@ -576,6 +577,157 @@ function setRemark(recordid) {
 			});
 		}
 	});
+}
+var excelExporting = false;
+function exportExcel(){
+	if(excelExporting){
+		layer.msg('正在导出，请稍候');
+		return;
+	}
+	excelExporting = true;
+	var pageSize = 100;
+	var records = [];
+	var total = 0;
+	var progressLayer = layer.open({
+		type: 1,
+		title: '导出Excel',
+		closeBtn: 0,
+		shadeClose: false,
+		area: ['420px', '150px'],
+		content: '<div style="padding:22px 25px;">'
+			+ '<div id="excel-export-text" style="margin-bottom:10px;">正在查询解析记录...</div>'
+			+ '<div class="progress" style="margin-bottom:0;">'
+			+ '<div id="excel-export-progress" class="progress-bar progress-bar-striped active" role="progressbar" style="width:0%;">0%</div>'
+			+ '</div></div>'
+	});
+
+	function updateProgress(percent, text){
+		percent = Math.max(0, Math.min(100, Math.round(percent)));
+		$('#excel-export-text').text(text);
+		$('#excel-export-progress').css('width', percent + '%').text(percent + '%');
+	}
+
+	function getQueryParams(offset){
+		var params = {
+			pageNumber: Math.floor(offset / pageSize) + 1,
+			pageSize: pageSize,
+			offset: offset,
+			limit: pageSize
+		};
+		$('#searchToolbar').find(':input[name]').each(function(){
+			params[$(this).attr('name')] = $(this).val();
+		});
+		return params;
+	}
+
+	function fetchPage(offset){
+		return $.ajax({
+			type: 'POST',
+			url: '/record/data/{$domainId}',
+			data: getQueryParams(offset),
+			dataType: 'json'
+		}).then(function(response){
+			var rows;
+			if(Array.isArray(response)){
+				rows = response;
+				total = rows.length;
+			}else{
+				rows = response && Array.isArray(response.rows) ? response.rows : [];
+				total = parseInt(response && response.total, 10) || 0;
+			}
+			Array.prototype.push.apply(records, rows);
+			var loaded = records.length;
+			var percent = total > 0 ? loaded / total * 95 : 95;
+			updateProgress(percent, '正在查询解析记录：' + loaded + (total > 0 ? ' / ' + total : '') + ' 条');
+
+			// 客户端分页类型会一次返回全部记录；服务端分页类型按页继续查询。
+			if(Array.isArray(response) || rows.length === 0 || (total > 0 && loaded >= total)
+				|| (total === 0 && rows.length < pageSize)){
+				return records;
+			}
+			return fetchPage(offset + pageSize);
+		});
+	}
+
+	fetchPage(0).then(function(rows){
+		if(rows.length === 0){
+			layer.close(progressLayer);
+			excelExporting = false;
+			layer.msg('没有可导出的解析记录');
+			return;
+		}
+		updateProgress(98, '正在生成Excel文件，共 ' + rows.length + ' 条...');
+		setTimeout(function(){
+			try{
+				downloadRecordExcel(rows);
+				updateProgress(100, '导出完成，共 ' + rows.length + ' 条');
+				setTimeout(function(){
+					layer.close(progressLayer);
+					layer.msg('Excel导出成功', {icon: 1, time: 1200});
+				}, 300);
+			}catch(e){
+				layer.close(progressLayer);
+				layer.alert('生成Excel失败：' + e.message, {icon: 2});
+			}finally{
+				excelExporting = false;
+			}
+		}, 30);
+	}, function(){
+		layer.close(progressLayer);
+		excelExporting = false;
+		layer.alert('查询解析记录失败，请稍后重试', {icon: 2});
+	});
+}
+function downloadRecordExcel(records){
+	var columns = [
+		{title: '记录ID', value: function(row){ return row.RecordId; }},
+		{title: '主机记录', value: function(row){ return row.Name; }},
+		{title: '记录类型', value: function(row){
+			if(row.Type == 'REDIRECT_URL') return '显性URL';
+			if(row.Type == 'FORWARD_URL') return '隐性URL';
+			return row.Type;
+		}},
+		{title: '线路值', value: function(row){ return row.Line; }},
+		{title: '线路类型', value: function(row){ return row.LineName; }},
+		{title: '记录值', value: function(row){
+			var value = Array.isArray(row.Value) ? row.Value.join(',') : row.Value;
+			return row.Type == 'MX' && dnsconfig.type != 'huawei' ? value + ' | ' + row.MX : value;
+		}},
+		{title: 'TTL', value: function(row){ return row.TTL; }},
+	];
+	if(showWeight){
+		columns.push({title: '权重', value: function(row){ return row.Weight; }});
+	}
+	if(dnsconfig.remark > 0){
+		columns.push({title: '备注', value: function(row){ return row.Remark; }});
+	}
+	columns.push({title: '更新时间', value: function(row){ return row.UpdateTime; }});
+	columns.push({title: '状态', value: function(row){ return String(row.Status) == '1' ? '启用' : '暂停'; }});
+
+	if(typeof XLSX === 'undefined'){
+		throw new Error('Excel组件加载失败，请刷新页面后重试');
+	}
+	function excelValue(value){
+		if(value === null || typeof value === 'undefined') return '';
+		return String(value).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+	}
+
+	var workbook = XLSX.utils.book_new();
+	var sheetData = [columns.map(function(column){ return column.title; })];
+	for(var i = 0; i < records.length; i++){
+		sheetData.push(columns.map(function(column){
+			return excelValue(column.value(records[i]));
+		}));
+	}
+	var worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+	worksheet['!cols'] = columns.map(function(column){
+		if(column.title == '记录值') return {wch: 35};
+		if(column.title == '记录ID' || column.title == '主机记录' || column.title == '备注' || column.title == '更新时间') return {wch: 20};
+		return {wch: 12};
+	});
+	XLSX.utils.book_append_sheet(workbook, worksheet, '解析记录');
+	var filename = '{$domainName}_解析记录_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+	XLSX.writeFile(workbook, filename, {bookType: 'xlsx', compression: true});
 }
 function operation(action){
 	var rows = $("#listTable").bootstrapTable('getSelections');
