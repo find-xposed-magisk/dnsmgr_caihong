@@ -1,0 +1,387 @@
+{extend name="common/layout" /}
+{block name="title"}按记录值搜索{/block}
+{block name="main"}
+<style>
+#search-progress-panel{display:none;margin-top:15px;margin-bottom:15px;}
+#search-progress-panel .progress{margin-bottom:8px;}
+#result-toolbar{margin-bottom:10px;}
+td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:360px;}
+</style>
+
+<div class="modal" id="modal-batch-edit" role="dialog" aria-labelledby="batch-edit-title" aria-hidden="true" data-backdrop="static">
+	<div class="modal-dialog">
+		<div class="modal-content animated flipInX">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+				<h4 class="modal-title" id="batch-edit-title">批量修改解析记录</h4>
+			</div>
+			<div class="modal-body">
+				<form class="form-horizontal" id="batch-edit-form">
+					<div class="form-group">
+						<label class="col-sm-3 control-label">已选择</label>
+						<div class="col-sm-9"><p class="form-control-static"><span id="selected-count">0</span> 条记录</p></div>
+					</div>
+					<div class="form-group">
+						<label class="col-sm-3 control-label">记录类型</label>
+						<div class="col-sm-9">
+							<select name="type" class="form-control">
+								<option value="A">A</option>
+								<option value="CNAME">CNAME</option>
+								<option value="AAAA">AAAA</option>
+								<option value="NS">NS</option>
+								<option value="MX">MX</option>
+								<option value="SRV">SRV</option>
+								<option value="TXT">TXT</option>
+								<option value="CAA">CAA</option>
+								<option value="REDIRECT_URL">显性URL</option>
+								<option value="FORWARD_URL">隐性URL</option>
+								<option value="LOC">LOC</option>
+								<option value="PTR">PTR</option>
+								<option value="LUA">LUA</option>
+							</select>
+						</div>
+					</div>
+					<div class="form-group">
+						<label class="col-sm-3 control-label">记录值</label>
+						<div class="col-sm-9">
+							<input type="text" class="form-control" name="value" placeholder="输入新的记录值" required>
+						</div>
+					</div>
+				</form>
+				<div class="alert alert-warning" style="margin-bottom:0;">将逐条调用现有修改接口。修改期间请勿关闭页面。</div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-white" data-dismiss="modal">取消</button>
+				<button type="button" class="btn btn-primary" onclick="startBatchEdit()">开始修改</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="row">
+	<div class="col-xs-12 center-block" style="float:none;">
+		<div class="panel panel-default panel-intro">
+			<div class="panel-heading">
+				<h3 class="panel-title"><a href="/domain" class="btn btn-sm btn-default pull-right" style="margin-top:-6px"><i class="fa fa-reply fa-fw"></i> 返回</a>按记录值搜索</h3>
+			</div>
+			<div class="panel-body">
+				<form class="form-inline" id="search-form" onsubmit="startSearch();return false;">
+					<div class="form-group">
+						<label for="record-value">记录值</label>
+						<input type="text" class="form-control" id="record-value" placeholder="例如：192.0.2.1" autocomplete="off" required>
+					</div>
+					<button type="submit" class="btn btn-primary" id="search-button"><i class="fa fa-search"></i> 搜索全部域名</button>
+					<button type="button" class="btn btn-warning" id="stop-button" onclick="stopSearch()" style="display:none;"><i class="fa fa-stop"></i> 停止</button>
+				</form>
+
+				<div id="search-progress-panel">
+					<div class="progress">
+						<div id="search-progress" class="progress-bar progress-bar-striped active" role="progressbar" style="width:0%;">0%</div>
+					</div>
+					<div id="search-status">准备搜索...</div>
+				</div>
+
+				<div id="result-toolbar">
+					<button type="button" class="btn btn-primary" id="batch-edit-button" onclick="openBatchEdit()" disabled><i class="fa fa-edit"></i> 批量修改选中记录</button>
+					<span id="result-summary" class="text-muted" style="margin-left:10px;">尚未搜索</span>
+				</div>
+				<table id="result-table"></table>
+			</div>
+		</div>
+	</div>
+</div>
+{/block}
+{block name="script"}
+<script src="/static/js/layer/layer.js"></script>
+<script src="/static/js/bootstrap-table-1.21.4.min.js"></script>
+<script type="application/json" id="domain-list-data">{$domainList|json_encode|raw}</script>
+<script>
+var domainList = JSON.parse(document.getElementById('domain-list-data').textContent || '[]');
+var searchResults = [];
+var searching = false;
+var stopRequested = false;
+
+$(document).ready(function(){
+	$('#result-table').bootstrapTable({
+		data: [],
+		uniqueId: '_key',
+		pagination: true,
+		pageSize: 20,
+		pageList: [10, 20, 50, 100],
+		maintainMetaData: true,
+		escape: true,
+		locale: 'zh-CN',
+		columns: [
+			{field: 'selected', checkbox: true},
+			{field: 'domainName', title: '域名'},
+			{field: 'dnsType', title: '平台', formatter: function(value, row){
+				var name = $('<div>').text(value || '').html();
+				var icon = row.icon ? '<img src="/static/images/' + encodeURIComponent(row.icon) + '" class="type-logo" alt=""> ' : '';
+				return icon + name;
+			}},
+			{field: 'Name', title: '主机记录'},
+			{field: 'Type', title: '记录类型'},
+			{field: 'ValueText', title: '记录值'},
+			{field: 'LineName', title: '线路'},
+			{field: 'TTL', title: 'TTL'}
+		],
+		onCheck: updateSelectedCount,
+		onUncheck: updateSelectedCount,
+		onCheckAll: updateSelectedCount,
+		onUncheckAll: updateSelectedCount
+	});
+});
+
+function normalizeValue(value){
+	if(Array.isArray(value)){
+		return value.map(function(item){ return String(item).trim(); });
+	}
+	return [String(value == null ? '' : value).trim()];
+}
+
+function valueMatches(value, keyword){
+	var values = normalizeValue(value);
+	for(var i = 0; i < values.length; i++){
+		if(values[i] === keyword) return true;
+	}
+	return false;
+}
+
+function updateSearchProgress(done, total, text){
+	var percent = total > 0 ? Math.round(done / total * 100) : 100;
+	percent = Math.max(0, Math.min(100, percent));
+	$('#search-progress').css('width', percent + '%').text(percent + '%');
+	$('#search-status').text(text);
+}
+
+function requestRecords(domain, keyword, offset, subdomain){
+	var data = {
+		offset: offset || 0,
+		limit: 100
+	};
+	if(keyword !== null) data.value = keyword;
+	if(subdomain) data.subdomain = subdomain;
+	return $.ajax({
+		type: 'POST',
+		url: '/record/data/' + domain.id,
+		dataType: 'json',
+		data: data
+	});
+}
+
+async function searchDomain(domain, keyword){
+	if(domain.type === 'qingcloud'){
+		return searchQingCloudDomain(domain, keyword);
+	}
+	var offset = 0;
+	var records = [];
+	while(true){
+		var response = await requestRecords(domain, keyword, offset);
+		var rows;
+		var total;
+		if(Array.isArray(response)){
+			rows = response;
+			total = rows.length;
+		}else{
+			rows = response && Array.isArray(response.rows) ? response.rows : [];
+			total = parseInt(response && response.total, 10) || 0;
+		}
+		Array.prototype.push.apply(records, rows);
+		if(Array.isArray(response) || rows.length === 0 || records.length >= total || rows.length < 100){
+			break;
+		}
+		offset += rows.length;
+	}
+
+	return records.filter(function(record){
+		return valueMatches(record.Value, keyword);
+	});
+}
+
+async function searchQingCloudDomain(domain, keyword){
+	var offset = 0;
+	var parents = [];
+	while(true){
+		var response = await requestRecords(domain, null, offset);
+		var rows = response && Array.isArray(response.rows) ? response.rows : [];
+		var total = parseInt(response && response.total, 10) || 0;
+		Array.prototype.push.apply(parents, rows);
+		if(rows.length === 0 || parents.length >= total || rows.length < 100) break;
+		offset += rows.length;
+	}
+
+	var records = [];
+	for(var i = 0; i < parents.length; i++){
+		var childResponse = await requestRecords(domain, null, 0, parents[i].RecordId);
+		var children = childResponse && Array.isArray(childResponse.rows) ? childResponse.rows : [];
+		for(var j = 0; j < children.length; j++){
+			if(valueMatches(children[j].Value, keyword)) records.push(children[j]);
+		}
+	}
+	return records;
+}
+
+async function startSearch(){
+	if(searching) return;
+	var keyword = $.trim($('#record-value').val());
+	if(!keyword){
+		layer.msg('请输入要搜索的记录值');
+		return;
+	}
+	if(domainList.length === 0){
+		layer.msg('没有可搜索的域名');
+		return;
+	}
+
+	searching = true;
+	stopRequested = false;
+	searchResults = [];
+	$('#result-table').bootstrapTable('load', []);
+	$('#batch-edit-button').prop('disabled', true);
+	$('#search-button').prop('disabled', true);
+	$('#stop-button').show();
+	$('#search-progress-panel').show();
+	$('#search-progress').addClass('active');
+	$('#result-summary').text('正在搜索...');
+
+	var failed = 0;
+	for(var i = 0; i < domainList.length; i++){
+		if(stopRequested) break;
+		var domain = domainList[i];
+		updateSearchProgress(i, domainList.length, '正在搜索：' + domain.name + '（' + (i + 1) + ' / ' + domainList.length + '）');
+		try{
+			var rows = await searchDomain(domain, keyword);
+			for(var j = 0; j < rows.length; j++){
+				rows[j].domainId = domain.id;
+				rows[j].domainName = domain.name;
+				rows[j].dnsType = domain.dnsType;
+				rows[j].icon = domain.icon;
+				rows[j].ValueText = normalizeValue(rows[j].Value).join(', ');
+				rows[j]._key = domain.id + '_' + rows[j].RecordId;
+				rows[j].selected = true;
+				searchResults.push(rows[j]);
+			}
+			$('#result-table').bootstrapTable('load', searchResults);
+		}catch(e){
+			failed++;
+		}
+	}
+
+	var completed = stopRequested ? '搜索已停止' : '搜索完成';
+	var doneCount = stopRequested ? i : domainList.length;
+	updateSearchProgress(doneCount, domainList.length, completed + '，找到 ' + searchResults.length + ' 条记录' + (failed ? '，' + failed + ' 个域名搜索失败' : ''));
+	$('#search-progress').removeClass('active');
+	$('#result-summary').text('共找到 ' + searchResults.length + ' 条记录' + (failed ? '，' + failed + ' 个域名搜索失败' : ''));
+	$('#batch-edit-button').prop('disabled', searchResults.length === 0);
+	$('#search-button').prop('disabled', false);
+	$('#stop-button').hide();
+	searching = false;
+	updateSelectedCount();
+}
+
+function stopSearch(){
+	stopRequested = true;
+	$('#stop-button').prop('disabled', true);
+	$('#search-status').text('正在停止，请等待当前域名搜索完成...');
+	setTimeout(function(){ $('#stop-button').prop('disabled', false); }, 500);
+}
+
+function getSelectedRows(){
+	return $('#result-table').bootstrapTable('getSelections');
+}
+
+function updateSelectedCount(){
+	var count = getSelectedRows().length;
+	$('#selected-count').text(count);
+}
+
+function openBatchEdit(){
+	var rows = getSelectedRows();
+	if(rows.length === 0){
+		layer.msg('请选择要修改的记录');
+		return;
+	}
+	$('#selected-count').text(rows.length);
+	$('#batch-edit-form select[name=type]').val(rows[0].Type);
+	$('#batch-edit-form input[name=value]').val('');
+	$('#modal-batch-edit').modal('show');
+}
+
+function updateEditProgress(done, total, success, fail, current){
+	var percent = total > 0 ? Math.round(done / total * 100) : 100;
+	$('#edit-progress').css('width', percent + '%').text(percent + '%');
+	$('#edit-status').text('正在修改：' + current + '（' + done + ' / ' + total + '），成功 ' + success + '，失败 ' + fail);
+}
+
+async function startBatchEdit(){
+	var rows = getSelectedRows();
+	var type = $('#batch-edit-form select[name=type]').val();
+	var value = $.trim($('#batch-edit-form input[name=value]').val());
+	if(rows.length === 0){
+		layer.msg('请选择要修改的记录');
+		return;
+	}
+	if(!type || !value){
+		layer.msg('记录类型和记录值不能为空');
+		return;
+	}
+
+	$('#modal-batch-edit').modal('hide');
+	var progressLayer = layer.open({
+		type: 1,
+		title: '批量修改进度',
+		closeBtn: 0,
+		area: ['520px'],
+		content: '<div style="padding:20px;"><div id="edit-status" style="margin-bottom:10px;">准备修改...</div>'
+			+ '<div class="progress" style="margin-bottom:0;"><div id="edit-progress" class="progress-bar progress-bar-striped active" role="progressbar" style="width:0%;">0%</div></div></div>'
+	});
+
+	var success = 0;
+	var fail = 0;
+	var errors = [];
+	for(var i = 0; i < rows.length; i++){
+		var row = rows[i];
+		updateEditProgress(i, rows.length, success, fail, row.Name + '.' + row.domainName);
+		try{
+			var response = await $.ajax({
+				type: 'POST',
+				url: '/record/batchedit/' + row.domainId,
+				dataType: 'json',
+				data: {
+					action: 'value',
+					type: type,
+					value: value,
+					mode: row.Mode || 1,
+					recordinfo: JSON.stringify([row])
+				}
+			});
+			if(response && response.code == 0 && response.msg && response.msg.indexOf('成功1条') !== -1){
+				success++;
+				row.Type = type;
+				row.Value = value;
+				row.ValueText = value;
+			}else{
+				fail++;
+				errors.push(row.Name + '.' + row.domainName + '：' + (response && response.msg ? response.msg : '修改失败'));
+			}
+		}catch(e){
+			fail++;
+			errors.push(row.Name + '.' + row.domainName + '：请求失败');
+		}
+		updateEditProgress(i + 1, rows.length, success, fail, row.Name + '.' + row.domainName);
+	}
+
+	$('#edit-progress').removeClass('active');
+	$('#result-table').bootstrapTable('load', searchResults);
+	setTimeout(function(){
+		layer.close(progressLayer);
+		var message = '批量修改完成，成功 ' + success + ' 条，失败 ' + fail + ' 条';
+		if(errors.length){
+			message += '<br><br>' + errors.slice(0, 10).map(function(item){ return $('<div>').text(item).html(); }).join('<br>');
+			if(errors.length > 10) message += '<br>其余 ' + (errors.length - 10) + ' 条失败信息已省略';
+		}
+		layer.alert(message, {icon: fail ? 0 : 1, area: ['520px']});
+	}, 300);
+}
+</script>
+{/block}

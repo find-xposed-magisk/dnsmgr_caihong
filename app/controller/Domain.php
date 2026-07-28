@@ -1031,6 +1031,36 @@ class Domain extends BaseController
         return view('batchedit');
     }
 
+    public function record_search()
+    {
+        if (request()->user['type'] == 'domain') {
+            return redirect('/record/' . request()->user['id']);
+        }
+        if (!checkPermission(1)) return $this->alert('error', '无权限');
+
+        $list = Db::name('domain')->alias('A')->join('account B', 'A.aid = B.id')
+            ->field('A.id, A.name, B.type')
+            ->order('A.name', 'asc')
+            ->select();
+
+        $domainList = [];
+        foreach ($list as $row) {
+            if (request()->user['level'] == 1 && !in_array($row['name'], request()->user['permission'])) {
+                continue;
+            }
+            $domainList[] = [
+                'id' => $row['id'],
+                'name' => $row['name'],
+                'type' => $row['type'],
+                'dnsType' => isset(DnsHelper::$dns_config[$row['type']]) ? DnsHelper::$dns_config[$row['type']]['name'] : $row['type'],
+                'icon' => isset(DnsHelper::$dns_config[$row['type']]) ? DnsHelper::$dns_config[$row['type']]['icon'] : ''
+            ];
+        }
+
+        View::assign('domainList', $domainList);
+        return view('record_search');
+    }
+
     public function record_log()
     {
         $id = input('param.id/d');

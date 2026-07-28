@@ -114,6 +114,7 @@ Route::group(function () {
     Route::any('/record/weight/:id', 'domain/weight');
     Route::any('/record/alias/:id', 'domain/alias');
     Route::get('/record/import/:id', 'domain/record_import');
+    Route::get('/record/search', 'domain/record_search');
     Route::get('/record/:id', 'domain/record');
     Route::get('/record/smartparse', 'domain/smartparse');
     Route::post('/record/quickinfo/:id', 'domain/quickinfo');
