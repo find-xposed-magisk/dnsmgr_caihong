@@ -10,7 +10,7 @@ if [ ! -f /app/www/public/index.php ] || [ ! -f /app/firstrun ]; then
         rm -rf /app/www/runtime/*
     fi
 
-    chown -R www.www /app/www
+    chown -R www:www /app/www
 
     touch /app/firstrun
 fi
