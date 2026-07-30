@@ -4,43 +4,87 @@ FROM alpine:${ALPINE_VERSION}
 WORKDIR /app/www
 
 # Install packages and remove default server definition
-RUN apk add --no-cache \
-  bash \
-  curl \
-  nginx \
-  php83 \
-  php83-ctype \
-  php83-curl \
-  php83-dom \
-  php83-fileinfo \
-  php83-fpm \
-  php83-ftp \
-  php83-gd \
-  php83-gettext \
-  php83-intl \
-  php83-iconv \
-  php83-mbstring \
-  php83-mysqli \
-  php83-opcache \
-  php83-openssl \
-  php83-phar \
-  php83-sodium \
-  php83-session \
-  php83-simplexml \
-  php83-tokenizer \
-  php83-xml \
-  php83-xmlreader \
-  php83-xmlwriter \
-  php83-zip \
-  php83-pdo \
-  php83-pdo_mysql \
-  php83-pdo_sqlite \
-  php83-pecl-swoole \
-  php83-pecl-ssh2 \
-  supervisor \
-  && ln -sf /usr/bin/php83 /usr/bin/php
-
-RUN rm -rf /var/cache/apk/* /tmp/*
+ARG SWOOLE_VERSION=6.2.2
+RUN set -eux; \
+    apk add --no-cache \
+      bash \
+      curl \
+      nginx \
+      ca-certificates \
+      php83 \
+      php83-ctype \
+      php83-curl \
+      php83-dom \
+      php83-fileinfo \
+      php83-fpm \
+      php83-ftp \
+      php83-gd \
+      php83-gettext \
+      php83-intl \
+      php83-iconv \
+      php83-mbstring \
+      php83-mysqli \
+      php83-opcache \
+      php83-openssl \
+      php83-phar \
+      php83-sodium \
+      php83-session \
+      php83-simplexml \
+      php83-tokenizer \
+      php83-xml \
+      php83-xmlreader \
+      php83-xmlwriter \
+      php83-zip \
+      php83-pdo \
+      php83-pdo_mysql \
+      php83-pdo_sqlite \
+      php83-pecl-swoole \
+      php83-pecl-ssh2 \
+      supervisor \
+      && ln -sf /usr/bin/php83 /usr/bin/php; \
+    \
+    apk add --no-cache --virtual .swoole-build-deps \
+      php83-dev \
+      php83-pear \
+      autoconf \
+      automake \
+      make \
+      gcc \
+      g++ \
+      libc-dev \
+      linux-headers \
+      pkgconf \
+      re2c \
+      binutils \
+      openssl-dev \
+      curl-dev \
+      pcre2-dev; \
+    \
+    curl -fsSL \
+        "https://pecl.php.net/get/swoole-${SWOOLE_VERSION}.tgz" \
+        -o /tmp/swoole.tgz; \
+    mkdir -p /usr/src/swoole; \
+    tar -xzf /tmp/swoole.tgz \
+        -C /usr/src/swoole \
+        --strip-components=1; \
+    \
+    cd /usr/src/swoole; \
+    phpize83; \
+    ./configure \
+        --with-php-config=/usr/bin/php-config83 \
+        --enable-sockets \
+        --enable-swoole-curl \
+        --enable-cares \
+        --enable-brotli \
+        --enable-zstd; \
+    make -j"$(getconf _NPROCESSORS_ONLN)"; \
+    make install; \
+    strip --strip-unneeded /usr/lib/php83/modules/swoole.so; \
+    \
+    cd /; \
+    rm -rf /usr/src/swoole /tmp/swoole.tgz; \
+    apk del .swoole-build-deps; \
+    rm -rf /var/cache/apk/* /tmp/*
 
 # Configure nginx - http
 COPY config/nginx.conf /etc/nginx/nginx.conf
