@@ -845,9 +845,7 @@ class DnsHelper
         $account = self::getConfig($aid);
         if (!$account) return false;
         $dnstype = $account['type'];
-        $class = strtolower($dnstype) === 'goedge'
-            ? '\\app\\lib\\dns\\GoEdge'
-            : "\\app\\lib\\dns\\{$dnstype}";
+        $class = "\\app\\lib\\dns\\{$dnstype}";
         if (class_exists($class)) {
             $config = json_decode($account['config'] ?? '', true);
             $config['domain'] = $domain;
@@ -864,9 +862,7 @@ class DnsHelper
     public static function getModel2($account)
     {
         $dnstype = $account['type'];
-        $class = strtolower($dnstype) === 'goedge'
-            ? '\\app\\lib\\dns\\GoEdge'
-            : "\\app\\lib\\dns\\{$dnstype}";
+        $class = "\\app\\lib\\dns\\{$dnstype}";
         if (class_exists($class)) {
             $config = json_decode($account['config'] ?? '', true);
             $config['domain'] = $account['name'];
