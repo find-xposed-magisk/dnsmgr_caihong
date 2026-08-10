@@ -15,7 +15,6 @@
 			</div>
 			<div class="modal-body">
 				<form class="form-horizontal" id="form-store" onsubmit="return save(this)">
-					<input type="hidden" name="id"/>
 					<input type="hidden" name="subdomain"/>
 					<input type="hidden" name="type"/>
 					<div class="form-group">
@@ -156,7 +155,6 @@ function editframe(id){
 			if(data.code == 0){
 				$("#modal-store").modal('show');
 				$("#modal-title").html("设置权重 - "+row.SubDomain);
-				$("#form-store input[name=id]").val(id);
 				$("#form-store input[name=subdomain]").val(row.SubDomain);
 				$("#form-store input[name=type]").val(row.Type);
 				if(row.Type == 'CNAME') $("#weight-switch").prop("disabled", true);
