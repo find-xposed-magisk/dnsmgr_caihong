@@ -376,16 +376,6 @@ class DeployHelper
                     'placeholder' => 'DirectAdmin 账户密码或 Login Key',
                     'required' => true,
                 ],
-                'verify_tls' => [
-                    'name' => '验证面板 TLS 证书',
-                    'type' => 'radio',
-                    'options' => [
-                        '1' => '是（推荐）',
-                        '0' => '否',
-                    ],
-                    'value' => '1',
-                    'required' => true,
-                ],
                 'proxy' => [
                     'name' => '使用代理服务器',
                     'type' => 'radio',

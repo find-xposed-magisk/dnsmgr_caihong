@@ -13,7 +13,6 @@ class directadmin implements DeployInterface
     private string $url;
     private string $username;
     private string $password;
-    private bool $verifyTls;
     private bool $proxy;
     private $transport;
 
@@ -22,7 +21,6 @@ class directadmin implements DeployInterface
         $this->url = rtrim(trim((string)($config['url'] ?? '')), '/');
         $this->username = trim((string)($config['username'] ?? ''));
         $this->password = (string)($config['password'] ?? '');
-        $this->verifyTls = !isset($config['verify_tls']) || (string)$config['verify_tls'] !== '0';
         $this->proxy = isset($config['proxy']) && (string)$config['proxy'] === '1';
         $this->transport = $transport;
 
@@ -225,7 +223,7 @@ class directadmin implements DeployInterface
             'connect_timeout' => 10,
             'allow_redirects' => false,
             'http_errors' => false,
-            'verify' => $this->verifyTls,
+            'verify' => false,
             'auth' => [$this->username, $this->password],
             'headers' => [
                 'Accept' => 'application/x-www-form-urlencoded, application/json',
